@@ -2,8 +2,8 @@
 
 > **Last Updated:** December 14, 2025  
 > **Version:** 2.0  
-> **Author:** Yato561  
-> **Repository:** [UrlShortener](https://github.com/yato561/UrlShortener)
+> **Author:** LordCenk
+> **Repository:** snipp-url
 
 ---
 
