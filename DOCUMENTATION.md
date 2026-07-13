@@ -1,6 +1,6 @@
 # URL Shortener Application - Complete Documentation
 
-> **Last Updated:** December 14, 2025  
+> **Last Updated:** July, 2026  
 > **Version:** 2.0  
 > **Author:** LordCenk
 > **Repository:** snipp-url
@@ -951,7 +951,7 @@ Content-Type: application/json
 
 Request:
 {
-  "longUrl": "https://github.com/yato561/UrlShortener",
+  "longUrl": "(https://github.com/LordCenk/snipp-url)",
   "title": "My Project",
   "expiry": "2025-12-31T23:59:00"
 }
@@ -1527,7 +1527,7 @@ POST https://your-callback-url.com/webhook
    POST http://localhost:8081/urls/create
    Authorization: Bearer {token}
    {
-     "longUrl": "https://github.com/yato561/UrlShortener/issues/123",
+     "longUrl": "https://github.com/LordCenk/snipp-url/issues/123",
      "title": "GitHub Issue",
      "expiry": "2025-12-31T23:59:00"
    }
@@ -1763,7 +1763,7 @@ psql -U urluser -d urlshortenerdb -c "SELECT version();"
 
 ```bash
 # Clone repository
-git clone https://github.com/yato561/UrlShortener.git
+git clone https://github.com/LordCenk/snipp-url
 cd UrlShortener
 
 # Install dependencies
@@ -1890,7 +1890,7 @@ urlShortenerb/
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/yato561/UrlShortener.git
+git clone https://github.com/LordCenk/snipp-url
 cd UrlShortener
 
 # 2. Setup database
@@ -1916,8 +1916,8 @@ open http://localhost:8081/swagger-ui.html
 
 ## Support & Contribution
 
-- **Issues:** [GitHub Issues](https://github.com/yato561/UrlShortener/issues)
-- **Pull Requests:** [GitHub PRs](https://github.com/yato561/UrlShortener/pulls)
+- **Issues:** [GitHub Issues](https://github.com/LordCenk/snipp-url/issues)
+- **Pull Requests:** [GitHub PRs](https://github.com/LordCenk/snipp-url/pulls)
 - **Documentation:** This markdown file
 
 ---
