@@ -65,8 +65,17 @@ All endpoints in this section require authentication.
 A link is returned as:
 
 ```json
-{ "id": 42, "shortCode": "aZ3kQ9x", "longUrl": "https://example.com/page", "clickCount": 7 }
+{
+  "id": 42,
+  "shortCode": "aZ3kQ9x",
+  "longUrl": "https://example.com/page",
+  "clickCount": 7,
+  "expiry": "2026-12-31T23:59:00",
+  "createdAt": "2026-09-24T17:41:07.888"
+}
 ```
+
+`expiry` is `null` for links that never expire.
 
 The public short URL is `<base URL>/s/<shortCode>`.
 
@@ -148,7 +157,7 @@ Requires authentication. Summarises clicks across all of your links.
   "totalClicks": 120,
   "totalUrls": 4,
   "topUrl": { "id": 42, "shortCode": "aZ3kQ9x", "longUrl": "https://example.com/page", "clickCount": 90 },
-  "dailyClicks": [ { "date": "Sep 24", "clicks": 35 } ],
+  "dailyClicks": [ { "date": "Sep 24", "day": "2026-09-24", "clicks": 35 } ],
   "devices":     [ { "name": "Mobile", "percentage": 70 }, { "name": "Desktop", "percentage": 30 } ],
   "referrers":   [ { "name": "https://twitter.com/", "percentage": 60 }, { "name": "Direct", "percentage": 40 } ],
   "breakdown":   [ { "id": 42, "shortCode": "aZ3kQ9x", "longUrl": "https://example.com/page", "clickCount": 90 } ]
@@ -156,6 +165,7 @@ Requires authentication. Summarises clicks across all of your links.
 ```
 
 - `topUrl` is `null` when you have no links.
+- `dailyClicks` lists only days with clicks, oldest first. `day` is the ISO date and `date` a short display label.
 - `devices` groups clicks by device type, worked out from the `User-Agent` header, largest share first:
   - `Mobile`: phones
   - `Tablet`: tablets. iPads on iPadOS 13+ identify as desktop Safari by default, so they count as `Desktop`.

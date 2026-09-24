@@ -73,7 +73,10 @@ public class AnalyticsServiceImpl implements AnalyticsService {
             try {
                 Map<String, Object> m = new HashMap<>();
                 if(row[0] != null) {
-                    m.put("date", fmt.format(((java.sql.Date) row[0]).toLocalDate()));
+                    java.time.LocalDate day = ((java.sql.Date) row[0]).toLocalDate();
+                    m.put("date", fmt.format(day));
+                    // ISO date so clients can place each count on a time axis (the label has no year)
+                    m.put("day", day.toString());
                     m.put("clicks", ((Long) row[1]).intValue());
                     dailyClicks.add(m);
                 }
@@ -133,8 +136,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
         response.put("totalClicks", totalClicks);
         response.put("totalUrls", totalUrls);
         // Map to a DTO: serializing the entity would expose its User (including the password hash)
-        response.put("topUrl", topUrls == null ? null : new UrlResponse(
-                topUrls.getId(), topUrls.getShortCode(), topUrls.getLongUrl(), topUrls.getClickCount()));
+        response.put("topUrl", topUrls == null ? null : UrlResponse.from(topUrls));
         response.put("dailyClicks", dailyClicks);
         response.put("devices", deviceStats);
         response.put("referrers", referrerStats);
