@@ -402,6 +402,9 @@ input[aria-invalid='true'] {
 .expiry-row .field.inline input {
   width: auto;
 }
+.tz-hint {
+  font-size: 0.8125rem;
+}
 .created {
   display: flex;
   align-items: center;

@@ -293,14 +293,35 @@ class UrlFlowIntegrationTests {
     }
 
     @Test
-    void linkResponsesIncludeExpiryAndCreationTime() throws Exception {
-        String created = createUrl("{\"longUrl\":\"https://example.com\",\"expiry\":\"2999-01-01T00:00\"}");
-        org.junit.jupiter.api.Assertions.assertTrue(created.contains("\"expiry\":\"2999-01-01T00:00:00\""), created);
-        org.junit.jupiter.api.Assertions.assertTrue(created.contains("\"createdAt\":\""), created);
+    void linkResponsesIncludeExpiryAndCreationTimeAsUtcInstants() throws Exception {
+        String created = createUrl("{\"longUrl\":\"https://example.com\",\"expiry\":\"2999-01-01T05:30:00+05:30\"}");
+        org.junit.jupiter.api.Assertions.assertTrue(created.contains("\"expiry\":\"2999-01-01T00:00:00Z\""), created);
+        org.junit.jupiter.api.Assertions.assertTrue(created.matches(".*\"createdAt\":\"[^\"]+Z\".*"), created);
 
         mvc.perform(get("/urls/all").header("Authorization", "Bearer " + token))
-                .andExpect(jsonPath("$[0].expiry").value("2999-01-01T00:00:00"))
-                .andExpect(jsonPath("$[0].createdAt").exists());
+                .andExpect(jsonPath("$[0].expiry").value("2999-01-01T00:00:00Z"));
+    }
+
+    @Test
+    void expiryWithOffsetIsTheSameMomentWhateverTheServerTimeZone() throws Exception {
+        // Offsets far from any server zone: a wall-clock-only reading of these would be off by many hours
+        String inOneHour = java.time.OffsetDateTime.now(java.time.ZoneOffset.ofHours(14)).plusHours(1).toString();
+        String anHourAgo = java.time.OffsetDateTime.now(java.time.ZoneOffset.ofHours(-12)).minusHours(1).toString();
+
+        String active = extract(createUrl("{\"longUrl\":\"https://example.com/a\",\"expiry\":\"" + inOneHour + "\"}"), "shortCode");
+        String expired = extract(createUrl("{\"longUrl\":\"https://example.com/b\",\"expiry\":\"" + anHourAgo + "\"}"), "shortCode");
+
+        mvc.perform(get("/s/" + active)).andExpect(status().isFound());
+        mvc.perform(get("/s/" + expired)).andExpect(status().isGone());
+    }
+
+    @Test
+    void expiryWithoutOffsetIsStillAcceptedAsServerTime() throws Exception {
+        String local = java.time.LocalDateTime.now().plusHours(1).withNano(0).toString();
+        String created = createUrl("{\"longUrl\":\"https://example.com\",\"expiry\":\"" + local + "\"}");
+        String expectedInstant = java.time.LocalDateTime.parse(local).atZone(java.time.ZoneId.systemDefault()).toInstant().toString();
+        org.junit.jupiter.api.Assertions.assertTrue(created.contains("\"expiry\":\"" + expectedInstant + "\""), created);
+        mvc.perform(get("/s/" + extract(created, "shortCode"))).andExpect(status().isFound());
     }
 
     @Test
