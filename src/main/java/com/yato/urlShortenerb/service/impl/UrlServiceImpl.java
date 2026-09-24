@@ -72,7 +72,7 @@ public class UrlServiceImpl implements UrlService {
 
 
         return ResponseEntity.ok(
-                new UrlResponse(url.getId(), url.getShortCode(), url.getLongUrl(), url.getClickCount())
+                UrlResponse.from(url)
         );
     }
 
@@ -136,7 +136,7 @@ public class UrlServiceImpl implements UrlService {
     }
 
     private UrlResponse toResponse(Url u) {
-        return new UrlResponse(u.getId(), u.getShortCode(), u.getLongUrl(), u.getClickCount());
+        return UrlResponse.from(u);
     }
 
     @Override

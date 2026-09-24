@@ -1,0 +1,57 @@
+# Serves the built frontend and forwards API paths to the backend, so the
+# browser talks to a single origin (no CORS). ${BACKEND_URL} is filled in from
+# the environment when the container starts.
+# Keep the scheme a load balancer in front of us saw (e.g. https), else use our own
+map $http_x_forwarded_proto $forwarded_proto {
+    default $http_x_forwarded_proto;
+    ''      $scheme;
+}
+
+# The port the browser used, from its Host header ("localhost:3000" -> 3000).
+# Empty for default ports, which drops the header and lets the backend use 80/443.
+map $http_host $forwarded_port {
+    "~:(?<port>[0-9]+)$" $port;
+    default              "";
+}
+
+server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Backend: API, short-link redirects, health and API docs.
+    # Trailing slashes keep these from matching the app's own paths.
+    location ~ ^/(auth|urls|analytics|s|api|v3)/ {
+        proxy_pass ${BACKEND_URL};
+        # Forward the browser's host *with* its port: Spring compares it with the
+        # Origin header, and a mismatch makes same-origin POSTs fail as CORS (403)
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Forwarded-Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $forwarded_proto;
+        # Without this the backend assumes port 80/443 once it sees X-Forwarded-Proto
+        proxy_set_header X-Forwarded-Port $forwarded_port;
+    }
+    location /swagger-ui {
+        proxy_pass ${BACKEND_URL};
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $forwarded_proto;
+        # Without this the backend assumes port 80/443 once it sees X-Forwarded-Proto
+        proxy_set_header X-Forwarded-Port $forwarded_port;
+    }
+
+    # Hashed build assets never change
+    location /assets/ {
+        add_header Cache-Control "public, max-age=31536000, immutable";
+        try_files $uri =404;
+    }
+
+    # Client-side routes all serve the app shell
+    location / {
+        add_header Cache-Control "no-cache";
+        try_files $uri /index.html;
+    }
+}

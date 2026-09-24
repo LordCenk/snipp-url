@@ -293,6 +293,27 @@ class UrlFlowIntegrationTests {
     }
 
     @Test
+    void linkResponsesIncludeExpiryAndCreationTime() throws Exception {
+        String created = createUrl("{\"longUrl\":\"https://example.com\",\"expiry\":\"2999-01-01T00:00\"}");
+        org.junit.jupiter.api.Assertions.assertTrue(created.contains("\"expiry\":\"2999-01-01T00:00:00\""), created);
+        org.junit.jupiter.api.Assertions.assertTrue(created.contains("\"createdAt\":\""), created);
+
+        mvc.perform(get("/urls/all").header("Authorization", "Bearer " + token))
+                .andExpect(jsonPath("$[0].expiry").value("2999-01-01T00:00:00"))
+                .andExpect(jsonPath("$[0].createdAt").exists());
+    }
+
+    @Test
+    void dailyClicksIncludeIsoDay() throws Exception {
+        String code = extract(createUrl("{\"longUrl\":\"https://example.com\"}"), "shortCode");
+        mvc.perform(get("/s/" + code)).andExpect(status().isFound());
+
+        mvc.perform(get("/analytics/overview").header("Authorization", "Bearer " + token))
+                .andExpect(jsonPath("$.dailyClicks[0].day").value(java.time.LocalDate.now().toString()))
+                .andExpect(jsonPath("$.dailyClicks[0].clicks").value(1));
+    }
+
+    @Test
     void openApiDocsAreServed() throws Exception {
         mvc.perform(get("/v3/api-docs")).andExpect(status().isOk());
     }

@@ -1,8 +1,13 @@
 # snipp-url
 
-A URL shortener REST API with user accounts, per-link expiry and click analytics.
+A URL shortener with user accounts, per-link expiry and click analytics: a Spring Boot REST API and a React web app.
 
-Built with Spring Boot 4 (Java 21), PostgreSQL, Flyway and JWT authentication.
+- **Backend** (repo root): Spring Boot 4 (Java 21), PostgreSQL, Flyway, JWT authentication
+- **Frontend** ([`frontend/`](frontend)): React, TypeScript and Vite
+
+| Links | Stats |
+|---|---|
+| ![Links page](docs/links.png) | ![Stats page](docs/stats.png) |
 
 ## Features
 
@@ -25,7 +30,15 @@ cp .env.example .env
 docker compose up --build
 ```
 
-The API is then available at http://localhost:8080. Try http://localhost:8080/api/health and http://localhost:8080/swagger-ui.html.
+Then open **http://localhost:3000**, create an account and shorten a link. Short links are served at `http://localhost:3000/s/<code>`.
+
+The stack is three containers:
+
+| Service | Port | What it is |
+|---|---|---|
+| `web` | 3000 | The React app, served by nginx, which also forwards API and short-link paths to `app` |
+| `app` | 8080 | The Spring Boot API (also reachable directly: http://localhost:8080/swagger-ui.html) |
+| `db` | 5432 | PostgreSQL 16 |
 
 ## Running without Docker
 
@@ -42,7 +55,17 @@ export APP_JWT_SECRET="$(openssl rand -base64 48)"
 ./mvnw spring-boot:run
 ```
 
-Flyway creates the schema on startup.
+Flyway creates the schema on startup. The API runs on http://localhost:8080.
+
+Then, in a second terminal, start the web app:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open http://localhost:5173. The Vite dev server forwards API calls to the backend on port 8080, so no CORS setup is needed. See [frontend/README.md](frontend/README.md) for details.
 
 ## Configuration
 
@@ -90,7 +113,27 @@ export APP_JWT_SECRET=test-secret-0123456789abcdef0123456789
 
 `RedisIntegrationTests` also runs when `REDIS_URL` is set (e.g. `REDIS_URL=redis://localhost:6379`).
 
-CI (`.github/workflows/ci.yml`) runs the same on every pull request against Postgres and Redis service containers. It then builds the Docker image and smoke-tests it.
+CI (`.github/workflows/ci.yml`) runs the same on every pull request against Postgres and Redis service containers, then builds the backend Docker image and smoke-tests it.
+
+Frontend unit tests and type checks:
+
+```bash
+cd frontend
+npm test
+npm run typecheck
+```
+
+End-to-end browser tests (Playwright) run against a running backend: sign up, shorten a link, follow it, check stats, edit, delete and log out.
+
+```bash
+cd frontend
+npx playwright install chromium   # once
+npm run e2e                       # starts the Vite dev server, expects the API on :8080
+E2E_BASE_URL=http://localhost:3000 npm run e2e   # or against the docker compose stack
+```
+
+CI runs the backend tests, the frontend checks, and the end-to-end tests against the full `docker compose` stack on every pull request.
+
 
 ## Deployment
 
@@ -134,6 +177,7 @@ Redis is treated as optional infrastructure. If it becomes unreachable:
 ## Project structure
 
 ```
+frontend/      React web app (see frontend/README.md)
 src/main/java/com/yato/urlShortenerb/
   config/      security, JWT, CORS, rate limiting
   controller/  REST endpoints

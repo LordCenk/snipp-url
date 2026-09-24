@@ -39,7 +39,8 @@ public class SecurityConfig {
                     config.setAllowedHeaders(List.of(
                             "Authorization", "Content-Type", "Accept"
                     ));
-                    config.setExposedHeaders(List.of("Authorization"));
+                    // X-Total-Count carries the total for paginated /urls/all responses
+                    config.setExposedHeaders(List.of("Authorization", "X-Total-Count"));
                     return config;
                 }))
                 .sessionManagement(session ->

@@ -101,4 +101,11 @@ class SecurityHardeningTests {
                 .andExpect(status().isForbidden())
                 .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
     }
+
+    @Test
+    void corsExposesTotalCountHeaderForPagination() throws Exception {
+        mvc.perform(get("/api/health").header("Origin", "https://allowed.example"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Expose-Headers", org.hamcrest.Matchers.containsString("X-Total-Count")));
+    }
 }
