@@ -9,7 +9,12 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -162,6 +167,66 @@ class UrlFlowIntegrationTests {
                 .andExpect(jsonPath("$.devices[0].name").value("TestAgent"))
                 .andExpect(jsonPath("$.referrers[?(@.name == 'https://twitter.com/')].percentage").value(50))
                 .andExpect(jsonPath("$.referrers[?(@.name == 'Direct')].percentage").value(50));
+    }
+
+    @Test
+    void concurrentClicksAreAllCounted() throws Exception {
+        String code = extract(createUrl("{\"longUrl\":\"https://example.com\"}"), "shortCode");
+        int clicks = 40;
+
+        ExecutorService pool = Executors.newFixedThreadPool(8);
+        try {
+            List<Future<Integer>> results = new ArrayList<>();
+            for (int i = 0; i < clicks; i++) {
+                results.add(pool.submit(() -> mvc.perform(get("/s/" + code)).andReturn().getResponse().getStatus()));
+            }
+            for (Future<Integer> r : results) {
+                org.junit.jupiter.api.Assertions.assertEquals(302, r.get());
+            }
+        } finally {
+            pool.shutdown();
+        }
+
+        mvc.perform(get("/urls/all").header("Authorization", "Bearer " + token))
+                .andExpect(jsonPath("$[0].clickCount").value(clicks));
+        mvc.perform(get("/analytics/overview").header("Authorization", "Bearer " + token))
+                .andExpect(jsonPath("$.totalClicks").value(clicks));
+    }
+
+    @Test
+    void longUserAgentAndReferrerDoNotBreakRedirect() throws Exception {
+        String code = extract(createUrl("{\"longUrl\":\"https://example.com\"}"), "shortCode");
+        String longValue = "https://example.com/" + "a".repeat(5000);
+
+        mvc.perform(get("/s/" + code).header("User-Agent", longValue).header("Referer", longValue))
+                .andExpect(status().isFound());
+        mvc.perform(get("/analytics/overview").header("Authorization", "Bearer " + token))
+                .andExpect(jsonPath("$.totalClicks").value(1));
+    }
+
+    @Test
+    void urlListSupportsOptionalPagination() throws Exception {
+        for (int i = 1; i <= 3; i++) {
+            createUrl("{\"longUrl\":\"https://example.com/" + i + "\"}");
+        }
+
+        // Without params: full list, unchanged response shape
+        mvc.perform(get("/urls/all").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3));
+
+        // Paged: newest first, total in header
+        mvc.perform(get("/urls/all?page=0&size=2").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(header().string("X-Total-Count", "3"))
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].longUrl").value("https://example.com/3"));
+        mvc.perform(get("/urls/all?page=1&size=2").header("Authorization", "Bearer " + token))
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].longUrl").value("https://example.com/1"));
+
+        mvc.perform(get("/urls/all?page=0&size=1000").header("Authorization", "Bearer " + token))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

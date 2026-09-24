@@ -19,8 +19,10 @@ public class AnalyticsEvent {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(columnDefinition = "text")
     private String device;
 
+    @Column(columnDefinition = "text")
     private String referrer;
 
     private LocalDateTime timestamp;

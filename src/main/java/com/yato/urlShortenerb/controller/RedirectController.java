@@ -1,9 +1,8 @@
 package com.yato.urlShortenerb.controller;
 
-import com.yato.urlShortenerb.entity.AnalyticsEvent;
 import com.yato.urlShortenerb.entity.Url;
-import com.yato.urlShortenerb.repo.AnalyticsEventRepo;
 import com.yato.urlShortenerb.repo.UrlRepo;
+import com.yato.urlShortenerb.service.AnalyticsService;
 import com.yato.urlShortenerb.util.UrlValidator;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,7 +21,7 @@ import java.time.LocalDateTime;
 public class RedirectController {
 
     private final UrlRepo urlRepo;
-    private final AnalyticsEventRepo analyticsRepo;
+    private final AnalyticsService analyticsService;
 
     @Operation(summary = "Redirect short code to original URL")
     @GetMapping("/s/{shortCode}")
@@ -49,18 +48,7 @@ public class RedirectController {
             return ResponseEntity.badRequest().body("Invalid short URL");
         }
 
-        // Increment click count
-        url.setClickCount(url.getClickCount() + 1);
-        urlRepo.save(url);
-
-        // 🔥 Record analytics event BEFORE redirect
-        AnalyticsEvent event = new AnalyticsEvent();
-        event.setDevice(request.getHeader("User-Agent"));
-        event.setReferrer(request.getHeader("Referer"));
-        event.setTimestamp(LocalDateTime.now());
-        event.setUrl(url);
-
-        analyticsRepo.save(event);
+        analyticsService.recordClick(url, request.getHeader("User-Agent"), request.getHeader("Referer"));
 
         // Redirect user
         return ResponseEntity.status(302)

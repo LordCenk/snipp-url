@@ -2,6 +2,7 @@ package com.yato.urlShortenerb.service.impl;
 
 
 import com.yato.urlShortenerb.dto.UrlResponse;
+import com.yato.urlShortenerb.entity.AnalyticsEvent;
 import com.yato.urlShortenerb.entity.Url;
 import com.yato.urlShortenerb.repo.AnalyticsEventRepo;
 import com.yato.urlShortenerb.repo.UrlRepo;
@@ -13,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
@@ -25,6 +27,26 @@ public class AnalyticsServiceImpl implements AnalyticsService {
     private final UrlRepo urlRepo;
     private final AnalyticsEventRepo analyticsRepo;
 
+    // Bounds what a client can make us store per click
+    private static final int MAX_HEADER_LENGTH = 1024;
+
+    @Override
+    @Transactional
+    public void recordClick(Url url, String userAgent, String referrer) {
+        urlRepo.incrementClickCount(url.getId());
+
+        AnalyticsEvent event = new AnalyticsEvent();
+        event.setDevice(truncate(userAgent));
+        event.setReferrer(truncate(referrer));
+        event.setTimestamp(LocalDateTime.now());
+        event.setUrl(url);
+        analyticsRepo.save(event);
+    }
+
+    private static String truncate(String value) {
+        return value == null || value.length() <= MAX_HEADER_LENGTH ? value : value.substring(0, MAX_HEADER_LENGTH);
+    }
+
     @Override
     @Transactional(readOnly = true)
     public ResponseEntity<?> getAnalytics(String userEmail){
@@ -34,14 +56,14 @@ public class AnalyticsServiceImpl implements AnalyticsService {
 
         List<Url> urls = urlRepo.findByUserId(user.getId());
 
-        long totalClicks = analyticsRepo.countByUrl(urls);
+        long totalClicks = analyticsRepo.countByUserId(user.getId());
         long totalUrls = urls.size();
 
         Url topUrls = urls.stream()
                 .max(Comparator.comparingLong(u -> u.getClickCount() == null ? 0 : u.getClickCount()))
                 .orElse(null);
 
-        List<Object[]> daily = analyticsRepo.countClicksPerDay(urls);
+        List<Object[]> daily = analyticsRepo.countClicksPerDay(user.getId());
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("MMM d");
 
         List<Map<String, Object>> dailyClicks = new ArrayList<>();
@@ -58,7 +80,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
             }
         }
 
-        List<Object[]> devices = analyticsRepo.countDevices(urls);
+        List<Object[]> devices = analyticsRepo.countDevices(user.getId());
         List<Map<String,Object>> deviceStats = new ArrayList<>();
 
         long deviceTotal = devices.stream().mapToLong(r -> (Long) r[1]).sum();
@@ -71,7 +93,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
             }
         }
 
-        List<Object[]> referrers = analyticsRepo.countReferrers(urls);
+        List<Object[]> referrers = analyticsRepo.countReferrers(user.getId());
         List<Map<String,Object>> referrerStats = new ArrayList<>();
 
         long refTotal = referrers.stream().mapToLong(r -> (Long) r[1]).sum();

@@ -13,6 +13,9 @@ import com.yato.urlShortenerb.util.ShortCodeGenerator;
 import com.yato.urlShortenerb.util.UrlValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -32,6 +35,9 @@ public class UrlServiceImpl implements UrlService {
     private final UrlRepo urlRepo;
     private final UserRepo userRepo;
     private final AnalyticsEventRepo analyticsRepo;
+
+    private static final int DEFAULT_PAGE_SIZE = 20;
+    private static final int MAX_PAGE_SIZE = 100;
 
     @Override
     public ResponseEntity<?> create(UrlRequest request, String currentUserEmail) {
@@ -98,22 +104,37 @@ public class UrlServiceImpl implements UrlService {
     }
 
     @Override
-    public ResponseEntity<?> getAll(String currentUserEmail) {
+    public ResponseEntity<?> getAll(String currentUserEmail, Integer page, Integer size) {
         log.debug("Fetching URLs for user {}", LogMasker.maskEmail(currentUserEmail));
 
         User user = findUser(currentUserEmail);
 
-        List<UrlResponse> resp = urlRepo.findByUserId(user.getId())
-                .stream()
-                .map(u -> new UrlResponse(
-                        u.getId(),
-                        u.getShortCode(),
-                        u.getLongUrl(),
-                        u.getClickCount()
-                ))
-                .collect(Collectors.toList());
+        // No paging params: return everything, as before
+        if (page == null && size == null) {
+            List<UrlResponse> resp = urlRepo.findByUserId(user.getId())
+                    .stream()
+                    .map(this::toResponse)
+                    .collect(Collectors.toList());
+            return ResponseEntity.ok(resp);
+        }
 
-        return ResponseEntity.ok(resp);
+        int pageNumber = page == null ? 0 : page;
+        int pageSize = size == null ? DEFAULT_PAGE_SIZE : size;
+        if (pageNumber < 0 || pageSize < 1 || pageSize > MAX_PAGE_SIZE) {
+            return ResponseEntity.badRequest()
+                    .body("page must be >= 0 and size between 1 and " + MAX_PAGE_SIZE);
+        }
+
+        // Body stays a plain array; the total is exposed in a header
+        Page<Url> result = urlRepo.findByUserId(user.getId(),
+                PageRequest.of(pageNumber, pageSize, Sort.by(Sort.Direction.DESC, "id")));
+        return ResponseEntity.ok()
+                .header("X-Total-Count", String.valueOf(result.getTotalElements()))
+                .body(result.getContent().stream().map(this::toResponse).toList());
+    }
+
+    private UrlResponse toResponse(Url u) {
+        return new UrlResponse(u.getId(), u.getShortCode(), u.getLongUrl(), u.getClickCount());
     }
 
     @Override

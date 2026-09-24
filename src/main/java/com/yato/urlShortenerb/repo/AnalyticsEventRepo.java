@@ -13,34 +13,34 @@ public interface AnalyticsEventRepo extends JpaRepository<AnalyticsEvent, Long> 
     @Query("""
         SELECT COUNT(a)
         FROM AnalyticsEvent a
-        WHERE a.url IN :urls
+        WHERE a.url.user.id = :userId
         """)
-    long countByUrl(List<Url> urls);
+    long countByUserId(Long userId);
 
     @Query("""
         SELECT FUNCTION('DATE', a.timestamp) AS day, COUNT(a)
         FROM AnalyticsEvent a
-        WHERE a.url IN :urls
+        WHERE a.url.user.id = :userId
         GROUP BY FUNCTION('DATE', a.timestamp)
         ORDER BY day
         """)
-    List<Object[]> countClicksPerDay(List<Url> urls);
+    List<Object[]> countClicksPerDay(Long userId);
 
     @Query("""
         SELECT a.device, COUNT(a)
         FROM AnalyticsEvent a
-        WHERE a.url IN :urls
+        WHERE a.url.user.id = :userId
         GROUP BY a.device
         """)
-    List<Object[]> countDevices(List<Url> urls);
+    List<Object[]> countDevices(Long userId);
 
     @Query("""
         SELECT a.referrer, COUNT(a)
         FROM AnalyticsEvent a
-        WHERE a.url IN :urls
+        WHERE a.url.user.id = :userId
         GROUP BY a.referrer
         """)
-    List<Object[]> countReferrers(List<Url> urls);
+    List<Object[]> countReferrers(Long userId);
 
     @Modifying
     @Query("DELETE FROM AnalyticsEvent a WHERE a.url = :url")

@@ -5,7 +5,7 @@ import org.springframework.http.ResponseEntity;
 
 public interface UrlService {
     ResponseEntity<?> create(UrlRequest request, String currentUserEmail);
-    ResponseEntity<?> getAll(String currentUserEmail);
+    ResponseEntity<?> getAll(String currentUserEmail, Integer page, Integer size);
     ResponseEntity<?> delete(Long id, String currentUserEmail);
     ResponseEntity<?> update(Long id, UrlRequest request, String currentUserEmail);
 }
