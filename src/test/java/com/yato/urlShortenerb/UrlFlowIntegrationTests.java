@@ -157,16 +157,40 @@ class UrlFlowIntegrationTests {
     @Test
     void analyticsReportsReferrersSeparatelyFromDevices() throws Exception {
         String code = extract(createUrl("{\"longUrl\":\"https://example.com\"}"), "shortCode");
-        mvc.perform(get("/s/" + code).header("User-Agent", "TestAgent").header("Referer", "https://twitter.com/"))
+        mvc.perform(get("/s/" + code).header("User-Agent", DESKTOP_UA).header("Referer", "https://twitter.com/"))
                 .andExpect(status().isFound());
-        mvc.perform(get("/s/" + code).header("User-Agent", "TestAgent"))
+        mvc.perform(get("/s/" + code).header("User-Agent", DESKTOP_UA))
                 .andExpect(status().isFound());
 
         mvc.perform(get("/analytics/overview").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.devices[0].name").value("TestAgent"))
                 .andExpect(jsonPath("$.referrers[?(@.name == 'https://twitter.com/')].percentage").value(50))
                 .andExpect(jsonPath("$.referrers[?(@.name == 'Direct')].percentage").value(50));
+    }
+
+    private static final String DESKTOP_UA =
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36";
+    private static final String IPHONE_UA =
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
+    private static final String ANDROID_PHONE_UA =
+            "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36";
+
+    @Test
+    void analyticsGroupsDevicesByType() throws Exception {
+        String code = extract(createUrl("{\"longUrl\":\"https://example.com\"}"), "shortCode");
+        // Two different phone User-Agents must land in the same "Mobile" bucket
+        for (String ua : new String[]{IPHONE_UA, ANDROID_PHONE_UA, IPHONE_UA, DESKTOP_UA}) {
+            mvc.perform(get("/s/" + code).header("User-Agent", ua)).andExpect(status().isFound());
+        }
+
+        mvc.perform(get("/analytics/overview").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.devices.length()").value(2))
+                // Sorted by share, largest first
+                .andExpect(jsonPath("$.devices[0].name").value("Mobile"))
+                .andExpect(jsonPath("$.devices[0].percentage").value(75))
+                .andExpect(jsonPath("$.devices[1].name").value("Desktop"))
+                .andExpect(jsonPath("$.devices[1].percentage").value(25));
     }
 
     @Test

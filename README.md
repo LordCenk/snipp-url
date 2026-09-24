@@ -10,7 +10,7 @@ Built with Spring Boot 4 (Java 21), PostgreSQL, Flyway and JWT authentication.
 - Shorten `http(s)` URLs to 7-character codes, with an optional expiry
 - `GET /s/{code}` redirects (302). Expired links return 410, unknown links 404
 - Update and delete your own links
-- Click analytics: totals, clicks per day, user agents, referrers, per-link counts
+- Click analytics: totals, clicks per day, device types (mobile, tablet, desktop, bot), referrers, per-link counts
 - Rate limiting on login, registration and link creation
 - Health checks at `/api/health` and OpenAPI docs at `/swagger-ui.html`
 
