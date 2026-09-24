@@ -61,13 +61,27 @@ public class AnalyticsServiceImpl implements AnalyticsService {
         List<Object[]> devices = analyticsRepo.countDevices(urls);
         List<Map<String,Object>> deviceStats = new ArrayList<>();
 
-        long refTotal = devices.stream().mapToLong(r -> (Long) r[1]).sum();
-        if(refTotal > 0) {  // Only process if there's data
+        long deviceTotal = devices.stream().mapToLong(r -> (Long) r[1]).sum();
+        if(deviceTotal > 0) {  // Only process if there's data
             for(Object[] row : devices){
                 Map<String, Object> m = new HashMap<>();
-                m.put("name", (String) row[0]);
-                m.put("percentage", Math.round(((Long) row[1]) * 100.0 / refTotal));
+                m.put("name", row[0] == null ? "Unknown" : (String) row[0]);
+                m.put("percentage", Math.round(((Long) row[1]) * 100.0 / deviceTotal));
                 deviceStats.add(m);
+            }
+        }
+
+        List<Object[]> referrers = analyticsRepo.countReferrers(urls);
+        List<Map<String,Object>> referrerStats = new ArrayList<>();
+
+        long refTotal = referrers.stream().mapToLong(r -> (Long) r[1]).sum();
+        if(refTotal > 0) {
+            for(Object[] row : referrers){
+                Map<String, Object> m = new HashMap<>();
+                // No Referer header means the link was opened directly (typed, bookmarked, app)
+                m.put("name", row[0] == null ? "Direct" : (String) row[0]);
+                m.put("percentage", Math.round(((Long) row[1]) * 100.0 / refTotal));
+                referrerStats.add(m);
             }
         }
 
@@ -88,8 +102,8 @@ public class AnalyticsServiceImpl implements AnalyticsService {
         response.put("topUrl", topUrls == null ? null : new UrlResponse(
                 topUrls.getId(), topUrls.getShortCode(), topUrls.getLongUrl(), topUrls.getClickCount()));
         response.put("dailyClicks", dailyClicks);
-        response.put("devices", deviceStats);  // ✓ IMPORTANT: deviceStats not devices
-        response.put("referrers", deviceStats);  // referrers is also deviceStats
+        response.put("devices", deviceStats);
+        response.put("referrers", referrerStats);
         response.put("breakdown", breakdown);
 
         return ResponseEntity.ok(response);

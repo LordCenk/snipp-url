@@ -35,7 +35,7 @@ public class RedirectController {
 
         if (url == null) {
             log.warn("Invalid short code {}", shortCode);
-            return ResponseEntity.badRequest().body("Invalid short URL");
+            return ResponseEntity.status(404).body("Short URL not found");
         }
 
         if (url.getExpiry() != null && url.getExpiry().isBefore(LocalDateTime.now())) {

@@ -104,7 +104,58 @@ class UrlFlowIntegrationTests {
 
         mvc.perform(delete("/urls/delete/" + id).header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk());
-        mvc.perform(get("/s/" + code)).andExpect(status().isBadRequest());
+        mvc.perform(get("/s/" + code)).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void healthEndpointIsPublic() throws Exception {
+        mvc.perform(get("/api/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UP"));
+        mvc.perform(get("/api/health/readiness")).andExpect(status().isOk());
+    }
+
+    @Test
+    void invalidRegistrationReturnsBadRequest() throws Exception {
+        for (String body : new String[]{"{}", "{\"email\":\"not-an-email\",\"password\":\"secret123\"}",
+                "{\"email\":\"x@test.com\",\"password\":\"\"}", "{not json"}) {
+            mvc.perform(post("/auth/register").contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isBadRequest());
+        }
+    }
+
+    @Test
+    void missingOrInvalidTokenReturnsUnauthorized() throws Exception {
+        mvc.perform(get("/urls/all")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/urls/all").header("Authorization", "Bearer garbage")).andExpect(status().isUnauthorized());
+        mvc.perform(delete("/urls/delete/1").header("Authorization", "Bearer garbage")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void missingResourcesReturnNotFound() throws Exception {
+        mvc.perform(delete("/urls/delete/999999").header("Authorization", "Bearer " + token))
+                .andExpect(status().isNotFound());
+        mvc.perform(post("/urls/update/999999").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"longUrl\":\"https://example.com\"}"))
+                .andExpect(status().isNotFound());
+        mvc.perform(delete("/urls/delete/abc").header("Authorization", "Bearer " + token))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/s/doesNotExist")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void analyticsReportsReferrersSeparatelyFromDevices() throws Exception {
+        String code = extract(createUrl("{\"longUrl\":\"https://example.com\"}"), "shortCode");
+        mvc.perform(get("/s/" + code).header("User-Agent", "TestAgent").header("Referer", "https://twitter.com/"))
+                .andExpect(status().isFound());
+        mvc.perform(get("/s/" + code).header("User-Agent", "TestAgent"))
+                .andExpect(status().isFound());
+
+        mvc.perform(get("/analytics/overview").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.devices[0].name").value("TestAgent"))
+                .andExpect(jsonPath("$.referrers[?(@.name == 'https://twitter.com/')].percentage").value(50))
+                .andExpect(jsonPath("$.referrers[?(@.name == 'Direct')].percentage").value(50));
     }
 
     @Test
