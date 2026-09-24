@@ -11,10 +11,11 @@ RUN mvn -B -q clean package -DskipTests
 # ---------- Run stage ----------
 FROM eclipse-temurin:21-jre
 
-# curl is used by the HEALTHCHECK; run as an unprivileged user
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl \
-    && rm -rf /var/lib/apt/lists/* \
+# curl (used by the HEALTHCHECK) ships with the base image. Installing it with apt
+# made every build depend on Ubuntu's mirrors being in sync, and builds failed
+# whenever a newer curl was indexed but not yet downloadable. Fail fast if it's gone.
+# Run as an unprivileged user.
+RUN command -v curl >/dev/null \
     && groupadd --system app \
     && useradd --system --gid app --no-create-home app
 
