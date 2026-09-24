@@ -1,0 +1,9 @@
+.git
+.github
+.idea
+.vscode
+target
+*.md
+*.txt
+.env
+docker-compose.yml
