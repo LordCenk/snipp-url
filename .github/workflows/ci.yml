@@ -49,3 +49,28 @@ jobs:
 
       - name: Build Docker image
         run: docker build -t snipp-url:ci .
+
+      - name: Smoke test Docker image
+        run: |
+          docker run -d --name app --network host \
+            -e DATABASE_URL -e SPRING_DATASOURCE_USERNAME -e SPRING_DATASOURCE_PASSWORD -e APP_JWT_SECRET \
+            snipp-url:ci
+          for i in $(seq 1 60); do
+            curl -fsS http://localhost:8080/api/health && break
+            sleep 2
+          done
+          curl -fsS http://localhost:8080/api/health | grep -q '"UP"'
+          # Must not run as root
+          test "$(docker exec app id -u)" != "0"
+          # Docker HEALTHCHECK must report healthy
+          for i in $(seq 1 30); do
+            status=$(docker inspect --format '{{.State.Health.Status}}' app)
+            [ "$status" = "healthy" ] && break
+            sleep 5
+          done
+          echo "health: $status"
+          [ "$status" = "healthy" ]
+
+      - name: Show container logs
+        if: failure()
+        run: docker logs app || true
