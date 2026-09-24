@@ -33,14 +33,15 @@ public class AnalyticsServiceImpl implements AnalyticsService {
 
     @Override
     @Transactional
-    public void recordClick(Url url, String userAgent, String referrer) {
-        urlRepo.incrementClickCount(url.getId());
+    public void recordClick(Long urlId, String userAgent, String referrer) {
+        urlRepo.incrementClickCount(urlId);
 
         AnalyticsEvent event = new AnalyticsEvent();
         event.setDevice(truncate(userAgent));
         event.setReferrer(truncate(referrer));
         event.setTimestamp(LocalDateTime.now());
-        event.setUrl(url);
+        // Reference only: sets the foreign key without loading the URL
+        event.setUrl(urlRepo.getReferenceById(urlId));
         analyticsRepo.save(event);
     }
 

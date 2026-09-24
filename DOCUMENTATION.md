@@ -128,6 +128,8 @@ Deletes the link and its click history.
 
 Public. Records a click (user agent, referrer, time) and redirects to the original URL.
 
+Short code lookups are cached in memory, so repeat clicks don't query the database for the target. Updating or deleting a link through the API takes effect immediately.
+
 | Response | Meaning |
 |---|---|
 | 302 | Redirect; the `Location` header holds the original URL |

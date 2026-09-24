@@ -1,5 +1,6 @@
 package com.yato.urlShortenerb.service.impl;
 
+import com.yato.urlShortenerb.cache.RedirectCache;
 import com.yato.urlShortenerb.dto.UrlRequest;
 import com.yato.urlShortenerb.dto.UrlResponse;
 import com.yato.urlShortenerb.entity.Url;
@@ -35,6 +36,7 @@ public class UrlServiceImpl implements UrlService {
     private final UrlRepo urlRepo;
     private final UserRepo userRepo;
     private final AnalyticsEventRepo analyticsRepo;
+    private final RedirectCache redirectCache;
 
     private static final int DEFAULT_PAGE_SIZE = 20;
     private static final int MAX_PAGE_SIZE = 100;
@@ -153,6 +155,7 @@ public class UrlServiceImpl implements UrlService {
         // Analytics events reference the URL via a foreign key, so remove them first
         analyticsRepo.deleteByUrl(url);
         urlRepo.delete(url);
+        redirectCache.evict(url.getShortCode());
         log.info("URL {} deleted", id);
 
         return ResponseEntity.ok("Deleted");
@@ -185,6 +188,7 @@ public class UrlServiceImpl implements UrlService {
         }
 
         urlRepo.save(url);
+        redirectCache.evict(url.getShortCode());
 
         return ResponseEntity.ok("URL updated successfully");
     }

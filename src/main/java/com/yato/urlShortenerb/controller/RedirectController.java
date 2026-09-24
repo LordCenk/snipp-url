@@ -1,7 +1,7 @@
 package com.yato.urlShortenerb.controller;
 
-import com.yato.urlShortenerb.entity.Url;
-import com.yato.urlShortenerb.repo.UrlRepo;
+import com.yato.urlShortenerb.cache.CachedRedirect;
+import com.yato.urlShortenerb.cache.RedirectCache;
 import com.yato.urlShortenerb.service.AnalyticsService;
 import com.yato.urlShortenerb.util.UrlValidator;
 import io.swagger.v3.oas.annotations.Operation;
@@ -20,7 +20,7 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class RedirectController {
 
-    private final UrlRepo urlRepo;
+    private final RedirectCache redirectCache;
     private final AnalyticsService analyticsService;
 
     @Operation(summary = "Redirect short code to original URL")
@@ -30,29 +30,29 @@ public class RedirectController {
 
         log.debug("Redirect request for {}", shortCode);
 
-        Url url = urlRepo.findByShortCode(shortCode).orElse(null);
+        CachedRedirect url = redirectCache.find(shortCode);
 
         if (url == null) {
             log.warn("Invalid short code {}", shortCode);
             return ResponseEntity.status(404).body("Short URL not found");
         }
 
-        if (url.getExpiry() != null && url.getExpiry().isBefore(LocalDateTime.now())) {
+        if (url.expiry() != null && url.expiry().isBefore(LocalDateTime.now())) {
             log.info("Expired short code {}", shortCode);
             return ResponseEntity.status(410).body("Short URL has expired");
         }
 
         // Guards against unsafe targets stored before creation-time validation existed
-        if (!UrlValidator.isValidHttpUrl(url.getLongUrl())) {
+        if (!UrlValidator.isValidHttpUrl(url.longUrl())) {
             log.warn("Refusing redirect to unsafe URL for short code {}", shortCode);
             return ResponseEntity.badRequest().body("Invalid short URL");
         }
 
-        analyticsService.recordClick(url, request.getHeader("User-Agent"), request.getHeader("Referer"));
+        analyticsService.recordClick(url.urlId(), request.getHeader("User-Agent"), request.getHeader("Referer"));
 
         // Redirect user
         return ResponseEntity.status(302)
-                .header("Location", url.getLongUrl())
+                .header("Location", url.longUrl())
                 .build();
     }
 }

@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -34,6 +35,9 @@ class UrlFlowIntegrationTests {
 
     @Autowired
     private MockMvc mvc;
+
+    @Autowired
+    private JdbcTemplate jdbc;
 
     private String token;
 
@@ -251,6 +255,41 @@ class UrlFlowIntegrationTests {
 
         mvc.perform(get("/urls/all?page=0&size=1000").header("Authorization", "Bearer " + token))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void repeatRedirectsAreServedFromCache() throws Exception {
+        String code = extract(createUrl("{\"longUrl\":\"https://example.com/original\"}"), "shortCode");
+        mvc.perform(get("/s/" + code)).andExpect(header().string("Location", "https://example.com/original"));
+
+        // Change the row behind the application's back: a cached lookup won't see it
+        jdbc.update("UPDATE urls SET long_url = ? WHERE short_code = ?", "https://example.com/changed-in-db", code);
+        mvc.perform(get("/s/" + code))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "https://example.com/original"));
+
+        // Clicks are still recorded on cache hits
+        mvc.perform(get("/analytics/overview").header("Authorization", "Bearer " + token))
+                .andExpect(jsonPath("$.totalClicks").value(2));
+    }
+
+    @Test
+    void updatingUrlEvictsCachedRedirect() throws Exception {
+        String created = createUrl("{\"longUrl\":\"https://example.com/old\"}");
+        String id = extract(created, "id");
+        String code = extract(created, "shortCode");
+        mvc.perform(get("/s/" + code)).andExpect(header().string("Location", "https://example.com/old"));
+
+        mvc.perform(post("/urls/update/" + id).header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"longUrl\":\"https://example.com/new\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/s/" + code)).andExpect(header().string("Location", "https://example.com/new"));
+
+        // Expiring the link through the API takes effect immediately too
+        mvc.perform(post("/urls/update/" + id).header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"expiry\":\"2020-01-01T00:00\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/s/" + code)).andExpect(status().isGone());
     }
 
     @Test
