@@ -1,5 +1,6 @@
 package com.yato.urlShortenerb.config;
 
+import com.yato.urlShortenerb.ratelimit.RateLimiter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -12,16 +13,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Fixed-window, per-client-IP rate limiting for abuse-prone endpoints
- * (login/register brute force, link-creation spam).
- * <p>
- * State is in memory, so limits apply per instance. When running several
- * instances, move this to a shared store (e.g. Redis) or the API gateway.
+ * Per-client-IP rate limiting for abuse-prone endpoints (login/register brute
+ * force, link-creation spam). Counting is delegated to a {@link RateLimiter}:
+ * in memory per instance by default, or shared through Redis when
+ * APP_REDIS_ENABLED=true.
  */
 @Slf4j
 @Component
@@ -29,21 +26,18 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class RateLimitFilter extends OncePerRequestFilter {
 
     private static final long WINDOW_MS = 60_000;
-    private static final int CLEANUP_EVERY = 1_000;
 
+    private final RateLimiter rateLimiter;
     private final int authPerMinute;
     private final int createPerMinute;
-    private final Map<String, Window> windows = new ConcurrentHashMap<>();
-    private final AtomicInteger requestCount = new AtomicInteger();
 
     public RateLimitFilter(
+            RateLimiter rateLimiter,
             @Value("${app.rate-limit.auth-per-minute:10}") int authPerMinute,
             @Value("${app.rate-limit.create-per-minute:30}") int createPerMinute) {
+        this.rateLimiter = rateLimiter;
         this.authPerMinute = authPerMinute;
         this.createPerMinute = createPerMinute;
-    }
-
-    private record Window(long start, AtomicInteger count) {
     }
 
     @Override
@@ -57,18 +51,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
 
         int limit = bucket.equals("auth") ? authPerMinute : createPerMinute;
-        long now = System.currentTimeMillis();
-        String key = bucket + ":" + request.getRemoteAddr();
+        RateLimiter.Decision decision =
+                rateLimiter.tryAcquire(bucket + ":" + request.getRemoteAddr(), limit, WINDOW_MS);
 
-        Window window = windows.compute(key, (k, w) ->
-                w == null || now - w.start() >= WINDOW_MS ? new Window(now, new AtomicInteger()) : w);
-
-        if (requestCount.incrementAndGet() % CLEANUP_EVERY == 0) {
-            windows.entrySet().removeIf(e -> now - e.getValue().start() >= WINDOW_MS);
-        }
-
-        if (window.count().incrementAndGet() > limit) {
-            long retryAfterSeconds = Math.max(1, (window.start() + WINDOW_MS - now + 999) / 1000);
+        if (!decision.allowed()) {
+            long retryAfterSeconds = Math.max(1, (decision.retryAfterMs() + 999) / 1000);
             log.warn("Rate limit exceeded for {} on {}", request.getRemoteAddr(), bucket);
             response.setStatus(429);
             response.setHeader("Retry-After", String.valueOf(retryAfterSeconds));

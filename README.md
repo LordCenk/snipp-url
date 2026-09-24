@@ -12,6 +12,7 @@ Built with Spring Boot 4 (Java 21), PostgreSQL, Flyway and JWT authentication.
 - Update and delete your own links
 - Click analytics: totals, clicks per day, device types (mobile, tablet, desktop, bot), referrers, per-link counts
 - Rate limiting on login, registration and link creation
+- Redirect lookups cached; optional Redis to share rate limits and the cache across instances
 - Health checks at `/api/health` and OpenAPI docs at `/swagger-ui.html`
 
 The full API reference is in [DOCUMENTATION.md](DOCUMENTATION.md).
@@ -57,7 +58,11 @@ All configuration is done with environment variables.
 | `APP_CORS_ALLOWED_ORIGINS` | no | localhost dev ports and the existing Vercel frontends | Comma-separated list of frontend origins. Set this in production. |
 | `APP_RATE_LIMIT_AUTH_PER_MINUTE` | no | `10` | Login and registration requests per minute per client IP |
 | `APP_RATE_LIMIT_CREATE_PER_MINUTE` | no | `30` | Link creations per minute per client IP |
-| `APP_REDIRECT_CACHE_SPEC` | no | `maximumSize=10000,expireAfterWrite=10m` | Size and lifetime of the in-memory redirect cache (Caffeine spec) |
+| `APP_REDIS_ENABLED` | no | `false` | Share rate-limit counters and the redirect cache across instances through Redis. See [Running several instances](#running-several-instances). |
+| `REDIS_URL` | when Redis is enabled | `redis://localhost:6379` | Redis connection URL, e.g. `redis://:password@host:6379` or `rediss://...` for TLS |
+| `APP_REDIS_CACHE_TTL` | no | `10m` | Lifetime of redirect cache entries in Redis |
+| `REDIS_TIMEOUT` | no | `500ms` | Redis command timeout |
+| `APP_REDIRECT_CACHE_SPEC` | no | `maximumSize=10000,expireAfterWrite=10m` | Size and lifetime of the in-memory redirect cache (Caffeine spec), used when Redis is disabled |
 | `APP_LOG_LEVEL` | no | `INFO` | Log level for application code |
 | `SERVER_PORT` | no | `8080` | HTTP port |
 | `FORWARD_HEADERS_STRATEGY` | no | `native` | How `X-Forwarded-*` headers from a reverse proxy are handled |
@@ -83,7 +88,9 @@ export APP_JWT_SECRET=test-secret-0123456789abcdef0123456789
 ./mvnw verify
 ```
 
-CI (`.github/workflows/ci.yml`) runs the same on every pull request against a Postgres service container. It then builds the Docker image and smoke-tests it.
+`RedisIntegrationTests` also runs when `REDIS_URL` is set (e.g. `REDIS_URL=redis://localhost:6379`).
+
+CI (`.github/workflows/ci.yml`) runs the same on every pull request against Postgres and Redis service containers. It then builds the Docker image and smoke-tests it.
 
 ## Deployment
 
@@ -106,7 +113,23 @@ Checklist for production:
 1. Set `APP_JWT_SECRET` to a random value of at least 32 characters.
 2. Set `APP_CORS_ALLOWED_ORIGINS` to your frontend's URL(s) only.
 3. Point the platform's health check at `/api/health`.
-4. Rate limits are kept in memory per instance. If you run more than one instance, lower the limits accordingly, or move rate limiting to a shared store or your gateway.
+4. If you run more than one instance, enable Redis (below).
+
+### Running several instances
+
+By default, rate-limit counters and the redirect cache are kept in memory on each instance. That's right for a single instance. With several instances:
+
+- each instance would enforce the rate limits separately, so the effective limit grows with the number of instances
+- editing or deleting a link would clear the cache only on the instance that handled it; the others keep redirecting to the old target until the entry expires
+
+Set `APP_REDIS_ENABLED=true` and `REDIS_URL` to share both through Redis. Keys are prefixed with `snipp:`.
+
+Redis is treated as optional infrastructure. If it becomes unreachable:
+
+- rate limiting allows requests (fails open) and logs a warning at most once a minute
+- redirect lookups fall back to the database
+- `/api/health` stays UP, so a Redis outage doesn't make the platform restart the app
+- the app reconnects automatically when Redis is back
 
 ## Project structure
 

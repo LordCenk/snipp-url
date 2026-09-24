@@ -24,7 +24,7 @@ For setup, configuration and deployment, see [README.md](README.md).
 | 405 | Wrong HTTP method |
 | 409 | Conflicting data, e.g. a concurrent registration with the same email |
 | 410 | Short link has expired |
-| 429 | Rate limit exceeded. The `Retry-After` header says how many seconds to wait. |
+| 429 | Rate limit exceeded. The `Retry-After` header says how many seconds to wait. Limits are per client IP, and shared across instances when Redis is enabled. |
 | 500 | Unexpected server error |
 
 ## Authentication
@@ -128,7 +128,7 @@ Deletes the link and its click history.
 
 Public. Records a click (user agent, referrer, time) and redirects to the original URL.
 
-Short code lookups are cached in memory, so repeat clicks don't query the database for the target. Updating or deleting a link through the API takes effect immediately.
+Short code lookups are cached (in memory, or in Redis when enabled), so repeat clicks don't query the database for the target. Updating or deleting a link through the API takes effect immediately.
 
 | Response | Meaning |
 |---|---|
