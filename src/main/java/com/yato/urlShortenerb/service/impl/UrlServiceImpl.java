@@ -12,9 +12,11 @@ import com.yato.urlShortenerb.util.ShortCodeGenerator;
 import com.yato.urlShortenerb.util.UrlValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
@@ -46,7 +48,7 @@ public class UrlServiceImpl implements UrlService {
             }
         }
 
-        User user = userRepo.findByEmail(currentUserEmail).orElseThrow();
+        User user = findUser(currentUserEmail);
 
         Url url = new Url();
         url.setUser(user);
@@ -75,6 +77,16 @@ public class UrlServiceImpl implements UrlService {
         return code;
     }
 
+    private User findUser(String email) {
+        return userRepo.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
+    }
+
+    private Url findUrl(Long id) {
+        return urlRepo.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "URL not found"));
+    }
+
     // ISO-8601 local date-time, e.g. 2026-01-31T23:59 or 2026-01-31T23:59:00
     private LocalDateTime parseExpiry(String value) {
         try {
@@ -88,7 +100,7 @@ public class UrlServiceImpl implements UrlService {
     public ResponseEntity<?> getAll(String currentUserEmail) {
         log.info("Fetching URLs for user {}", currentUserEmail);
 
-        User user = userRepo.findByEmail(currentUserEmail).orElseThrow();
+        User user = findUser(currentUserEmail);
 
         List<UrlResponse> resp = urlRepo.findByUserId(user.getId())
                 .stream()
@@ -108,15 +120,8 @@ public class UrlServiceImpl implements UrlService {
     public ResponseEntity<?> delete(Long id, String currentUserEmail) {
         log.info("Deleting URL {} for {}", id, currentUserEmail);
 
-        if (currentUserEmail == null) {
-            return ResponseEntity.status(401).body("Invalid or expired token");
-        }
-
-        User user = userRepo.findByEmail(currentUserEmail)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        Url url = urlRepo.findById(id)
-                .orElseThrow(() -> new RuntimeException("URL not found"));
+        User user = findUser(currentUserEmail);
+        Url url = findUrl(id);
 
         if (!url.getUser().getId().equals(user.getId())) {
             log.warn("Forbidden delete attempt by {} for url {}", currentUserEmail, id);
@@ -133,11 +138,8 @@ public class UrlServiceImpl implements UrlService {
     @Override
     public ResponseEntity<?> update(Long id, UrlRequest request, String currentUserEmail) {
 
-        User user = userRepo.findByEmail(currentUserEmail)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        Url url = urlRepo.findById(id)
-                .orElseThrow(() -> new RuntimeException("URL not found"));
+        User user = findUser(currentUserEmail);
+        Url url = findUrl(id);
 
         if (!url.getUser().getId().equals(user.getId())) {
             return ResponseEntity.status(403).body("Forbidden");
