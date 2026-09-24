@@ -35,7 +35,6 @@ public class AuthController {
     })
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
-        log.info("Register endpoint called for {}", request.email());
         return userService.register(request);
     }
 
@@ -48,7 +47,6 @@ public class AuthController {
     })
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
-        log.info("Login endpoint called for {}", request.email());
         return userService.login(request);
     }
 }

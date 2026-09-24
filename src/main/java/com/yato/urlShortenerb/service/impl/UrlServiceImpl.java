@@ -8,6 +8,7 @@ import com.yato.urlShortenerb.repo.AnalyticsEventRepo;
 import com.yato.urlShortenerb.repo.UrlRepo;
 import com.yato.urlShortenerb.repo.UserRepo;
 import com.yato.urlShortenerb.service.UrlService;
+import com.yato.urlShortenerb.util.LogMasker;
 import com.yato.urlShortenerb.util.ShortCodeGenerator;
 import com.yato.urlShortenerb.util.UrlValidator;
 import lombok.RequiredArgsConstructor;
@@ -34,7 +35,7 @@ public class UrlServiceImpl implements UrlService {
 
     @Override
     public ResponseEntity<?> create(UrlRequest request, String currentUserEmail) {
-        log.info("Creating short URL for user {}", currentUserEmail);
+        log.debug("Creating short URL for user {}", LogMasker.maskEmail(currentUserEmail));
 
         if (!UrlValidator.isValidHttpUrl(request.longUrl())) {
             return ResponseEntity.badRequest().body("Invalid URL: must be an absolute http(s) URL");
@@ -59,7 +60,7 @@ public class UrlServiceImpl implements UrlService {
 
         urlRepo.save(url);
 
-        log.info("Created short code {} for URL {}", url.getShortCode(), url.getLongUrl());
+        log.info("Created short code {} (id {})", url.getShortCode(), url.getId());
 
 
         return ResponseEntity.ok(
@@ -98,7 +99,7 @@ public class UrlServiceImpl implements UrlService {
 
     @Override
     public ResponseEntity<?> getAll(String currentUserEmail) {
-        log.info("Fetching URLs for user {}", currentUserEmail);
+        log.debug("Fetching URLs for user {}", LogMasker.maskEmail(currentUserEmail));
 
         User user = findUser(currentUserEmail);
 
@@ -118,20 +119,20 @@ public class UrlServiceImpl implements UrlService {
     @Override
     @Transactional
     public ResponseEntity<?> delete(Long id, String currentUserEmail) {
-        log.info("Deleting URL {} for {}", id, currentUserEmail);
+        log.debug("Deleting URL {} for {}", id, LogMasker.maskEmail(currentUserEmail));
 
         User user = findUser(currentUserEmail);
         Url url = findUrl(id);
 
         if (!url.getUser().getId().equals(user.getId())) {
-            log.warn("Forbidden delete attempt by {} for url {}", currentUserEmail, id);
+            log.warn("Forbidden delete attempt by {} for url {}", LogMasker.maskEmail(currentUserEmail), id);
             return ResponseEntity.status(403).body("Forbidden");
         }
 
         // Analytics events reference the URL via a foreign key, so remove them first
         analyticsRepo.deleteByUrl(url);
         urlRepo.delete(url);
-        log.info("URL {} deleted successfully by {}", id, currentUserEmail);
+        log.info("URL {} deleted", id);
 
         return ResponseEntity.ok("Deleted");
     }

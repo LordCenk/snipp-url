@@ -2,6 +2,7 @@ package com.yato.urlShortenerb.config;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -18,8 +19,25 @@ public class JWTUtils {
     @Value("${app.jwt.expiration-ms:86400000}")
     private long jwtExpirationMs;
 
+    private static final int MIN_SECRET_BYTES = 32; // HS256 needs a key of at least 256 bits
+
+    private SecretKey signingKey;
+
+    // Fail at startup with a clear message instead of on the first login
+    @PostConstruct
+    void init() {
+        if (jwtSecret == null || jwtSecret.getBytes(StandardCharsets.UTF_8).length < MIN_SECRET_BYTES) {
+            throw new IllegalStateException(
+                    "APP_JWT_SECRET must be set and at least " + MIN_SECRET_BYTES + " bytes long");
+        }
+        if (jwtExpirationMs <= 0) {
+            throw new IllegalStateException("APP_JWT_EXPIRATION_MS must be positive");
+        }
+        signingKey = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+    }
+
     private SecretKey getSigningKey() {
-        return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+        return signingKey;
     }
 
     public String generateToken(String subject) {

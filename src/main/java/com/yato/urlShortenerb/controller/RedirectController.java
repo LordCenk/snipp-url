@@ -29,7 +29,7 @@ public class RedirectController {
     public ResponseEntity<?> redirect(@PathVariable String shortCode,
                                       HttpServletRequest request) {
 
-        log.info("Redirect request for {}", shortCode);
+        log.debug("Redirect request for {}", shortCode);
 
         Url url = urlRepo.findByShortCode(shortCode).orElse(null);
 
