@@ -147,14 +147,21 @@ Requires authentication. Summarises clicks across all of your links.
   "totalUrls": 4,
   "topUrl": { "id": 42, "shortCode": "aZ3kQ9x", "longUrl": "https://example.com/page", "clickCount": 90 },
   "dailyClicks": [ { "date": "Sep 24", "clicks": 35 } ],
-  "devices":     [ { "name": "Mozilla/5.0 (...)", "percentage": 80 } ],
+  "devices":     [ { "name": "Mobile", "percentage": 70 }, { "name": "Desktop", "percentage": 30 } ],
   "referrers":   [ { "name": "https://twitter.com/", "percentage": 60 }, { "name": "Direct", "percentage": 40 } ],
   "breakdown":   [ { "id": 42, "shortCode": "aZ3kQ9x", "longUrl": "https://example.com/page", "clickCount": 90 } ]
 }
 ```
 
 - `topUrl` is `null` when you have no links.
-- `devices` groups clicks by the raw `User-Agent` header.
+- `devices` groups clicks by device type, worked out from the `User-Agent` header, largest share first:
+  - `Mobile`: phones
+  - `Tablet`: tablets. iPads on iPadOS 13+ identify as desktop Safari by default, so they count as `Desktop`.
+  - `Desktop`: desktop and laptop browsers
+  - `Bot`: crawlers, link previews (e.g. Slack, Facebook, Twitter) and scripts such as curl
+  - `Other`: clients that aren't recognisable browsers
+  - `Unknown`: no `User-Agent` sent
+  - The type is worked out when analytics are requested, so clicks recorded before this grouping existed are included too.
 - `referrers` groups clicks by the `Referer` header. Clicks without one are listed as `Direct`.
 - Percentages are rounded, so they may not add up to exactly 100.
 

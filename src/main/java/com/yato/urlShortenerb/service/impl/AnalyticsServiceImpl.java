@@ -8,6 +8,7 @@ import com.yato.urlShortenerb.repo.AnalyticsEventRepo;
 import com.yato.urlShortenerb.repo.UrlRepo;
 import com.yato.urlShortenerb.repo.UserRepo;
 import com.yato.urlShortenerb.service.AnalyticsService;
+import com.yato.urlShortenerb.util.DeviceClassifier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -83,14 +84,24 @@ public class AnalyticsServiceImpl implements AnalyticsService {
         List<Object[]> devices = analyticsRepo.countDevices(user.getId());
         List<Map<String,Object>> deviceStats = new ArrayList<>();
 
-        long deviceTotal = devices.stream().mapToLong(r -> (Long) r[1]).sum();
+        // Group raw User-Agent strings into device types (Mobile, Desktop, ...).
+        // Done at read time, so clicks recorded before this change are grouped too.
+        Map<String, Long> countsByType = new HashMap<>();
+        for(Object[] row : devices){
+            countsByType.merge(DeviceClassifier.classify((String) row[0]), (Long) row[1], Long::sum);
+        }
+
+        long deviceTotal = countsByType.values().stream().mapToLong(Long::longValue).sum();
         if(deviceTotal > 0) {  // Only process if there's data
-            for(Object[] row : devices){
-                Map<String, Object> m = new HashMap<>();
-                m.put("name", row[0] == null ? "Unknown" : (String) row[0]);
-                m.put("percentage", Math.round(((Long) row[1]) * 100.0 / deviceTotal));
-                deviceStats.add(m);
-            }
+            countsByType.entrySet().stream()
+                    .sorted(Map.Entry.<String, Long>comparingByValue().reversed()
+                            .thenComparing(Map.Entry.comparingByKey()))
+                    .forEach(e -> {
+                        Map<String, Object> m = new HashMap<>();
+                        m.put("name", e.getKey());
+                        m.put("percentage", Math.round(e.getValue() * 100.0 / deviceTotal));
+                        deviceStats.add(m);
+                    });
         }
 
         List<Object[]> referrers = analyticsRepo.countReferrers(user.getId());
