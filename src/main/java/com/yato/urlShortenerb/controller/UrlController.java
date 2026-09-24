@@ -37,8 +37,9 @@ public class UrlController {
 
     @Operation(summary="Get all user's URLs")
     @GetMapping("/all")
-    public ResponseEntity<?> getAll(){
-        return urlService.getAll(currentUserEmail());
+    public ResponseEntity<?> getAll(@RequestParam(required = false) Integer page,
+                                    @RequestParam(required = false) Integer size){
+        return urlService.getAll(currentUserEmail(), page, size);
     }
     @Operation(summary = "Delete a URL")
     @DeleteMapping("/delete/{id}")
