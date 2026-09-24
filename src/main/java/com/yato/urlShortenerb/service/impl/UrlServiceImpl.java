@@ -4,17 +4,20 @@ import com.yato.urlShortenerb.dto.UrlRequest;
 import com.yato.urlShortenerb.dto.UrlResponse;
 import com.yato.urlShortenerb.entity.Url;
 import com.yato.urlShortenerb.entity.User;
+import com.yato.urlShortenerb.repo.AnalyticsEventRepo;
 import com.yato.urlShortenerb.repo.UrlRepo;
 import com.yato.urlShortenerb.repo.UserRepo;
 import com.yato.urlShortenerb.service.UrlService;
 import com.yato.urlShortenerb.util.ShortCodeGenerator;
+import com.yato.urlShortenerb.util.UrlValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -25,23 +28,32 @@ public class UrlServiceImpl implements UrlService {
 
     private final UrlRepo urlRepo;
     private final UserRepo userRepo;
+    private final AnalyticsEventRepo analyticsRepo;
 
     @Override
     public ResponseEntity<?> create(UrlRequest request, String currentUserEmail) {
         log.info("Creating short URL for user {}", currentUserEmail);
 
+        if (!UrlValidator.isValidHttpUrl(request.longUrl())) {
+            return ResponseEntity.badRequest().body("Invalid URL: must be an absolute http(s) URL");
+        }
+
+        LocalDateTime expiry = null;
+        if (request.expiry() != null && !request.expiry().isBlank()) {
+            expiry = parseExpiry(request.expiry());
+            if (expiry == null) {
+                return ResponseEntity.badRequest().body("Invalid expiry format");
+            }
+        }
+
         User user = userRepo.findByEmail(currentUserEmail).orElseThrow();
 
         Url url = new Url();
         url.setUser(user);
-        url.setLongUrl(request.longUrl());
+        url.setLongUrl(request.longUrl().trim());
         url.setShortCode(generateUniqueCode());
         url.setCrtAt(LocalDateTime.now());
-
-// Apply expiry if provided
-        if (request.expiry() != null && !request.expiry().isEmpty()) {
-            url.setExpiry(LocalDateTime.parse(request.expiry()));
-        }
+        url.setExpiry(expiry);
 
         urlRepo.save(url);
 
@@ -61,6 +73,15 @@ public class UrlServiceImpl implements UrlService {
 
         log.debug("Generated unique short code: {}", code);
         return code;
+    }
+
+    // ISO-8601 local date-time, e.g. 2026-01-31T23:59 or 2026-01-31T23:59:00
+    private LocalDateTime parseExpiry(String value) {
+        try {
+            return LocalDateTime.parse(value.trim());
+        } catch (DateTimeParseException e) {
+            return null;
+        }
     }
 
     @Override
@@ -83,6 +104,7 @@ public class UrlServiceImpl implements UrlService {
     }
 
     @Override
+    @Transactional
     public ResponseEntity<?> delete(Long id, String currentUserEmail) {
         log.info("Deleting URL {} for {}", id, currentUserEmail);
 
@@ -101,6 +123,8 @@ public class UrlServiceImpl implements UrlService {
             return ResponseEntity.status(403).body("Forbidden");
         }
 
+        // Analytics events reference the URL via a foreign key, so remove them first
+        analyticsRepo.deleteByUrl(url);
         urlRepo.delete(url);
         log.info("URL {} deleted successfully by {}", id, currentUserEmail);
 
@@ -121,18 +145,19 @@ public class UrlServiceImpl implements UrlService {
 
         // Update only if longUrl is provided
         if (request.longUrl() != null && !request.longUrl().isBlank()) {
-            url.setLongUrl(request.longUrl());
+            if (!UrlValidator.isValidHttpUrl(request.longUrl())) {
+                return ResponseEntity.badRequest().body("Invalid URL: must be an absolute http(s) URL");
+            }
+            url.setLongUrl(request.longUrl().trim());
         }
 
         // Handle expiry
         if (request.expiry() != null && !request.expiry().isBlank()) {
-            try {
-                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
-                LocalDateTime expiry = LocalDateTime.parse(request.expiry(), formatter);
-                url.setExpiry(expiry);
-            } catch (Exception e) {
+            LocalDateTime expiry = parseExpiry(request.expiry());
+            if (expiry == null) {
                 return ResponseEntity.badRequest().body("Invalid expiry format");
             }
+            url.setExpiry(expiry);
         }
 
         urlRepo.save(url);

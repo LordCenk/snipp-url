@@ -1,6 +1,7 @@
 package com.yato.urlShortenerb.service.impl;
 
 
+import com.yato.urlShortenerb.dto.UrlResponse;
 import com.yato.urlShortenerb.entity.Url;
 import com.yato.urlShortenerb.repo.AnalyticsEventRepo;
 import com.yato.urlShortenerb.repo.UrlRepo;
@@ -83,7 +84,9 @@ public class AnalyticsServiceImpl implements AnalyticsService {
         Map<String,Object> response = new HashMap<>();
         response.put("totalClicks", totalClicks);
         response.put("totalUrls", totalUrls);
-        response.put("topUrl", topUrls);  // Can be null, that's ok
+        // Map to a DTO: serializing the entity would expose its User (including the password hash)
+        response.put("topUrl", topUrls == null ? null : new UrlResponse(
+                topUrls.getId(), topUrls.getShortCode(), topUrls.getLongUrl(), topUrls.getClickCount()));
         response.put("dailyClicks", dailyClicks);
         response.put("devices", deviceStats);  // ✓ IMPORTANT: deviceStats not devices
         response.put("referrers", deviceStats);  // referrers is also deviceStats
