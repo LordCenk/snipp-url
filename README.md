@@ -57,6 +57,7 @@ All configuration is done with environment variables.
 | `APP_CORS_ALLOWED_ORIGINS` | no | localhost dev ports and the existing Vercel frontends | Comma-separated list of frontend origins. Set this in production. |
 | `APP_RATE_LIMIT_AUTH_PER_MINUTE` | no | `10` | Login and registration requests per minute per client IP |
 | `APP_RATE_LIMIT_CREATE_PER_MINUTE` | no | `30` | Link creations per minute per client IP |
+| `APP_REDIRECT_CACHE_SPEC` | no | `maximumSize=10000,expireAfterWrite=10m` | Size and lifetime of the in-memory redirect cache (Caffeine spec) |
 | `APP_LOG_LEVEL` | no | `INFO` | Log level for application code |
 | `SERVER_PORT` | no | `8080` | HTTP port |
 | `FORWARD_HEADERS_STRATEGY` | no | `native` | How `X-Forwarded-*` headers from a reverse proxy are handled |
