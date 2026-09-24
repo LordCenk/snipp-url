@@ -7,6 +7,7 @@ import com.yato.urlShortenerb.dto.RegisterRequest;
 import com.yato.urlShortenerb.entity.User;
 import com.yato.urlShortenerb.repo.UserRepo;
 import com.yato.urlShortenerb.service.UserService;
+import com.yato.urlShortenerb.util.LogMasker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -24,10 +25,10 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public ResponseEntity<?> register(RegisterRequest request) {
-        log.debug("Register request for {}", request.email());
+        log.debug("Register request for {}", LogMasker.maskEmail(request.email()));
 
         if (repo.findByEmail(request.email()).isPresent()) {
-            log.warn("Email already exists: {}", request.email());
+            log.info("Registration with existing email {}", LogMasker.maskEmail(request.email()));
             return ResponseEntity.badRequest().body("Email already exists");
         }
 
@@ -37,13 +38,13 @@ public class UserServiceImpl implements UserService {
 
         repo.save(user);
 
-        log.info("User registered {}", request.email());
+        log.info("User registered {}", LogMasker.maskEmail(request.email()));
         return ResponseEntity.ok("User registered");
     }
     @Override
     public ResponseEntity<?> login(LoginRequest request) {
 
-        log.info("Login attempt for {}", request.email());
+        log.debug("Login attempt for {}", LogMasker.maskEmail(request.email()));
 
         var opt = repo.findByEmail(request.email());
 

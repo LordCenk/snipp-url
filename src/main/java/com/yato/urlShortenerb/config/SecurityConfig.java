@@ -1,6 +1,7 @@
 package com.yato.urlShortenerb.config;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -19,6 +20,10 @@ public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
 
+    // Comma-separated list, set with APP_CORS_ALLOWED_ORIGINS
+    @Value("${app.cors.allowed-origins}")
+    private List<String> allowedOrigins;
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 
@@ -27,12 +32,7 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(request -> {
                     CorsConfiguration config = new CorsConfiguration();
                     config.setAllowCredentials(true);
-                    config.setAllowedOrigins(List.of(
-                            "http://localhost:5173",
-                            "http://localhost:5174",
-                            "https://url-shortenerf.vercel.app",
-                            "https://url-shortenerf-2rosroi2s-yato561s-projects.vercel.app"// 🔴 ADD THIS
-                    ));
+                    config.setAllowedOrigins(allowedOrigins);
                     config.setAllowedMethods(List.of(
                             "GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"
                     ));
