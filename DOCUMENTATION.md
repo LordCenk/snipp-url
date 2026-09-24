@@ -9,7 +9,10 @@ For setup, configuration and deployment, see [README.md](README.md).
 - Request and success bodies are JSON unless noted otherwise.
 - Error bodies are plain-text messages, e.g. `Invalid credentials`.
 - Authenticated endpoints need the header `Authorization: Bearer <token>`. The token comes from `POST /auth/login`.
-- Dates use ISO-8601 local date-time without a time zone, e.g. `2026-12-31T23:59` or `2026-12-31T23:59:00`.
+- Dates are ISO-8601.
+  - **Responses** return exact instants in UTC, e.g. `2026-12-31T18:29:00Z`. Show them in the user's time zone.
+  - **Requests** should send an instant with an offset, e.g. `2026-12-31T18:29:00Z` or `2026-12-31T23:59+05:30`, so the time means the same moment whatever the server's time zone.
+  - A date-time without an offset (e.g. `2026-12-31T23:59`) is still accepted for older clients, but is read as the **server's** local time.
 
 ### Status codes
 
@@ -70,8 +73,8 @@ A link is returned as:
   "shortCode": "aZ3kQ9x",
   "longUrl": "https://example.com/page",
   "clickCount": 7,
-  "expiry": "2026-12-31T23:59:00",
-  "createdAt": "2026-09-24T17:41:07.888"
+  "expiry": "2026-12-31T18:29:00Z",
+  "createdAt": "2026-09-24T17:41:07.888Z"
 }
 ```
 
@@ -82,7 +85,7 @@ The public short URL is `<base URL>/s/<shortCode>`.
 ### `POST /urls/create`
 
 ```json
-{ "longUrl": "https://example.com/page", "expiry": "2026-12-31T23:59" }
+{ "longUrl": "https://example.com/page", "expiry": "2026-12-31T23:59+05:30" }
 ```
 
 - `longUrl`: required. Must be an absolute `http` or `https` URL with a host, up to 2048 characters.
@@ -109,7 +112,7 @@ Lists your links.
 ### `POST /urls/update/{id}`
 
 ```json
-{ "longUrl": "https://example.com/new", "expiry": "2027-01-31T00:00" }
+{ "longUrl": "https://example.com/new", "expiry": "2027-01-31T00:00:00Z" }
 ```
 
 Both fields are optional; omitted or blank fields are left unchanged. The same validation as create applies.

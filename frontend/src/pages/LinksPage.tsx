@@ -4,7 +4,7 @@ import type { Link } from '../api/client';
 import Dialog from '../components/Dialog';
 import CopyButton from '../components/CopyButton';
 import { displayUrl, normalizeUrl } from '../lib/url';
-import { formatCount, formatDateTime, isExpired, toDateTimeInput } from '../lib/format';
+import { formatCount, formatDateTime, isExpired, toApiInstant, toDateTimeInput, userTimeZone } from '../lib/format';
 
 const PAGE_SIZE = 10;
 
@@ -201,7 +201,7 @@ function CreateLinkForm({ onCreated }: { onCreated: (link: Link) => void }) {
     }
     setBusy(true);
     try {
-      const link = await api.createLink(normalized.url, showExpiry && expiry ? expiry : null);
+      const link = await api.createLink(normalized.url, showExpiry ? toApiInstant(expiry) : null);
       setUrl('');
       setExpiry('');
       setShowExpiry(false);
@@ -237,10 +237,13 @@ function CreateLinkForm({ onCreated }: { onCreated: (link: Link) => void }) {
           <span>Expire this link</span>
         </label>
         {showExpiry && (
-          <label className="field inline">
-            <span className="sr-only">Expires at</span>
-            <input type="datetime-local" value={expiry} onChange={(e) => setExpiry(e.target.value)} required />
-          </label>
+          <>
+            <label className="field inline">
+              <span className="sr-only">Expires at</span>
+              <input type="datetime-local" value={expiry} onChange={(e) => setExpiry(e.target.value)} required />
+            </label>
+            <span className="muted tz-hint">{userTimeZone()}</span>
+          </>
         )}
       </div>
       {error && <p className="alert alert-error" role="alert">{error}</p>}
@@ -265,7 +268,7 @@ function EditLinkDialog({ link, onClose, onSaved }: { link: Link; onClose: () =>
     setBusy(true);
     try {
       // The API leaves the expiry unchanged when it is omitted, so it can't be cleared here
-      await api.updateLink(link.id, normalized.url, expiry || null);
+      await api.updateLink(link.id, normalized.url, toApiInstant(expiry));
       onSaved();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save the link.');
@@ -281,7 +284,7 @@ function EditLinkDialog({ link, onClose, onSaved }: { link: Link; onClose: () =>
           <input type="text" inputMode="url" value={url} onChange={(e) => setUrl(e.target.value)} autoFocus />
         </label>
         <label className="field">
-          <span>Expires at <span className="muted">(optional)</span></span>
+          <span>Expires at <span className="muted">(optional, {userTimeZone()})</span></span>
           <input type="datetime-local" value={expiry} onChange={(e) => setExpiry(e.target.value)} />
         </label>
         {error && <p className="alert alert-error" role="alert">{error}</p>}

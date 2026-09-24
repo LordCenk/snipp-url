@@ -131,3 +131,56 @@ test('an expired session sends the user back to login with a message', async ({ 
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole('status')).toHaveText('Your session has expired. Please log in again.');
 });
+
+/** "YYYY-MM-DDTHH:mm" wall-clock time in `timeZone`, as typed into a datetime-local input. */
+function wallClock(date: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date);
+  const get = (type: string) => parts.find((p) => p.type === type)!.value;
+  return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`;
+}
+
+async function createWithExpiry(page: Page, url: string, expiry: string): Promise<string> {
+  await page.getByPlaceholder('Paste a long URL').fill(url);
+  await page.getByLabel('Expire this link').check();
+  await page.getByLabel('Expires at').fill(expiry);
+  await page.getByRole('button', { name: 'Shorten' }).click();
+  const row = page.locator('tbody tr').filter({ hasText: url });
+  await expect(row).toBeVisible();
+  return (await row.locator('.short-link').textContent())!.trim();
+}
+
+// The server runs in its own zone (UTC in docker). Expiry times picked in the browser
+// must mean the same moment there, however far the user's zone is from the server's.
+for (const { timeZone, label } of [
+  { timeZone: 'Pacific/Kiritimati', label: 'UTC+14' },
+  { timeZone: 'Pacific/Pago_Pago', label: 'UTC-11' },
+]) {
+  test.describe(`a user in ${timeZone} (${label})`, () => {
+    test.use({ timezoneId: timeZone });
+
+    test('expiry times mean the same moment on the server', async ({ page, request }) => {
+      await register(page, uniqueEmail(), 'e2e-password-1');
+      const now = Date.now();
+
+      const pastCode = await createWithExpiry(page, 'example.com/tz-past', wallClock(new Date(now - 2 * 3600_000), timeZone));
+      const futureCode = await createWithExpiry(page, 'example.com/tz-future', wallClock(new Date(now + 2 * 3600_000), timeZone));
+
+      await expect(page.locator('tbody tr').filter({ hasText: 'example.com/tz-past' }).getByText('Expired')).toBeVisible();
+      await expect(page.locator('tbody tr').filter({ hasText: 'example.com/tz-future' }).getByText(/^Expires /)).toBeVisible();
+      expect((await visitShortLink(request, pastCode)).status()).toBe(410);
+      expect((await visitShortLink(request, futureCode)).status()).toBe(302);
+
+      // The edit dialog shows the expiry back in the user's own time zone
+      await page.getByRole('button', { name: `Edit ${futureCode}` }).click();
+      await expect(page.getByLabel(/Expires at/)).toHaveValue(wallClock(new Date(now + 2 * 3600_000), timeZone));
+    });
+  });
+}

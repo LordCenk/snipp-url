@@ -24,6 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -96,12 +98,22 @@ public class UrlServiceImpl implements UrlService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "URL not found"));
     }
 
-    // ISO-8601 local date-time, e.g. 2026-01-31T23:59 or 2026-01-31T23:59:00
+    /**
+     * Expiry as ISO-8601. Preferred: an exact instant with an offset, e.g.
+     * 2026-01-31T23:59:00Z or 2026-01-31T23:59+05:30, converted to the server's
+     * time zone (the zone every stored timestamp uses). Also accepted, for older
+     * clients: a local date-time without an offset, taken as server time.
+     */
     private LocalDateTime parseExpiry(String value) {
+        String trimmed = value.trim();
         try {
-            return LocalDateTime.parse(value.trim());
-        } catch (DateTimeParseException e) {
-            return null;
+            return OffsetDateTime.parse(trimmed).atZoneSameInstant(ZoneId.systemDefault()).toLocalDateTime();
+        } catch (DateTimeParseException notAnInstant) {
+            try {
+                return LocalDateTime.parse(trimmed);
+            } catch (DateTimeParseException e) {
+                return null;
+            }
         }
     }
 
