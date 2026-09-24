@@ -4,6 +4,7 @@ import com.yato.urlShortenerb.entity.AnalyticsEvent;
 import com.yato.urlShortenerb.entity.Url;
 import com.yato.urlShortenerb.repo.AnalyticsEventRepo;
 import com.yato.urlShortenerb.repo.UrlRepo;
+import com.yato.urlShortenerb.util.UrlValidator;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +35,17 @@ public class RedirectController {
 
         if (url == null) {
             log.warn("Invalid short code {}", shortCode);
+            return ResponseEntity.status(404).body("Short URL not found");
+        }
+
+        if (url.getExpiry() != null && url.getExpiry().isBefore(LocalDateTime.now())) {
+            log.info("Expired short code {}", shortCode);
+            return ResponseEntity.status(410).body("Short URL has expired");
+        }
+
+        // Guards against unsafe targets stored before creation-time validation existed
+        if (!UrlValidator.isValidHttpUrl(url.getLongUrl())) {
+            log.warn("Refusing redirect to unsafe URL for short code {}", shortCode);
             return ResponseEntity.badRequest().body("Invalid short URL");
         }
 

@@ -3,6 +3,7 @@ package com.yato.urlShortenerb.repo;
 import com.yato.urlShortenerb.entity.AnalyticsEvent;
 import com.yato.urlShortenerb.entity.Url;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 import java.util.List;
@@ -40,4 +41,8 @@ public interface AnalyticsEventRepo extends JpaRepository<AnalyticsEvent, Long> 
         GROUP BY a.referrer
         """)
     List<Object[]> countReferrers(List<Url> urls);
+
+    @Modifying
+    @Query("DELETE FROM AnalyticsEvent a WHERE a.url = :url")
+    void deleteByUrl(Url url);
 }
